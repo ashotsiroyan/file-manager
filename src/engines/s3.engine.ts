@@ -22,7 +22,7 @@ let awsSdkCache: AwsSdkModules | null = null;
 
 function loadAwsSdk(): AwsSdkModules {
   if (awsSdkCache) return awsSdkCache;
-  const requireFn = createRequire(import.meta.url);
+  const requireFn = createRequire(__filename);
 
   try {
     const client = requireFn('@aws-sdk/client-s3');

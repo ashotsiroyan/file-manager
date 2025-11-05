@@ -13,7 +13,7 @@ let gcsSdkCache: GcsModule | null = null;
 
 function loadGcsSdk(): GcsModule {
   if (gcsSdkCache) return gcsSdkCache;
-  const requireFn = createRequire(import.meta.url);
+  const requireFn = createRequire(__filename);
   try {
     const storageLib = requireFn('@google-cloud/storage');
     gcsSdkCache = { Storage: storageLib.Storage };

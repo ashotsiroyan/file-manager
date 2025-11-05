@@ -1,7 +1,6 @@
 {
   "name": "@ashotsiroyan/file-manager",
-  "version": "1.0.7",
-  "type": "module",
+  "version": "1.0.8",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -9,11 +8,19 @@
     "README.md",
     "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ashotsiroyan/file-manager.git"
+  },
+  "keywords": [
+    "file-manager", "s3", "gcc"
+  ],
   "license": "MIT",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
