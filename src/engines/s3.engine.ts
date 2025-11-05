@@ -6,7 +6,7 @@ import {
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../types';
+} from '../interfaces/types';
 
 type AwsSdkModules = {
   S3Client: any;

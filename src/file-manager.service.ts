@@ -6,7 +6,7 @@ import {
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from './types';
+} from './interfaces/types';
 import { makeStorageKey } from './file-key.util';
 
 export const FILE_MANAGER_ENGINE = Symbol('FILE_MANAGER_ENGINE');

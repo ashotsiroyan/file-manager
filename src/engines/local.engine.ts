@@ -5,7 +5,7 @@ import {
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../types';
+} from '../interfaces/types';
 import { createReadStream, createWriteStream, promises as fsp } from 'fs';
 import { mkdir, stat, access, readdir, rename } from 'fs/promises';
 import { constants } from 'fs';

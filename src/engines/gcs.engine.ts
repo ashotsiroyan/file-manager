@@ -6,7 +6,7 @@ import {
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../types';
+} from '../interfaces/types';
 
 type GcsModule = { Storage: any };
 let gcsSdkCache: GcsModule | null = null;

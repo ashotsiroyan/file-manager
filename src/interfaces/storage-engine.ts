@@ -4,7 +4,7 @@ import {
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../types';
+} from './types';
 
 export interface StorageEngine {
   putObject(input: PutObjectInput): Promise<PutObjectResult>;
