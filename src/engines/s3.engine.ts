@@ -1,4 +1,5 @@
 import { StorageEngine } from '../interfaces/storage-engine';
+import { createRequire } from 'module';
 import {
   GetObjectResult,
   ListObjectsResult,
@@ -7,29 +8,101 @@ import {
   SignedUrlOptions,
 } from '../types';
 
+type AwsSdkModules = {
+  S3Client: any;
+  GetObjectCommand: any;
+  PutObjectCommand: any;
+  CopyObjectCommand: any;
+  DeleteObjectCommand: any;
+  ListObjectsV2Command: any;
+  getSignedUrl: any;
+};
+
+let awsSdkCache: AwsSdkModules | null = null;
+
+function loadAwsSdk(): AwsSdkModules {
+  if (awsSdkCache) return awsSdkCache;
+  const requireFn = createRequire(import.meta.url);
+
+  try {
+    const client = requireFn('@aws-sdk/client-s3');
+    const presigner = requireFn('@aws-sdk/s3-request-presigner');
+    awsSdkCache = {
+      S3Client: client.S3Client,
+      GetObjectCommand: client.GetObjectCommand,
+      PutObjectCommand: client.PutObjectCommand,
+      CopyObjectCommand: client.CopyObjectCommand,
+      DeleteObjectCommand: client.DeleteObjectCommand,
+      ListObjectsV2Command: client.ListObjectsV2Command,
+      getSignedUrl: presigner.getSignedUrl,
+    };
+    return awsSdkCache;
+  } catch (error) {
+    throw new Error(
+      'S3 engine requires optional packages @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
+    );
+  }
+}
+
+export interface S3CredentialsOptions {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+}
+
 export interface S3EngineOptions {
   bucket: string;
   region?: string;
   baseUrlPublic?: string;
+  endpoint?: string;
+  forcePathStyle?: boolean;
+  credentials?: S3CredentialsOptions;
+  client?: any;
+  clientConfig?: Record<string, any>;
 }
 
 export class S3StorageEngine implements StorageEngine {
   private s3: any;
   private signer: any;
-  constructor(private readonly opts: S3EngineOptions) {
-    const { S3Client, GetObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } =
-      require('@aws-sdk/client-s3');
-    const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+  private readonly bucketName: string;
+  private readonly publicBaseUrl?: string;
+  
+  constructor(opts: S3EngineOptions) {
+    const {
+      S3Client,
+      GetObjectCommand,
+      PutObjectCommand,
+      CopyObjectCommand,
+      DeleteObjectCommand,
+      ListObjectsV2Command,
+      getSignedUrl,
+    } = loadAwsSdk();
 
-    this.s3 = new S3Client({ region: opts.region });
-    this.signer = { getSignedUrl, cmds: { GetObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } };
+    if (!opts.bucket) {
+      throw new Error('S3 bucket is required.');
+    }
+    this.bucketName = opts.bucket;
+    
+    this.publicBaseUrl = opts.baseUrlPublic ? opts.baseUrlPublic.replace(/\/$/, '') : undefined;
+    
+    const clientConfig: Record<string, any> = { ...(opts.clientConfig || {}) };
+    if (opts.region) clientConfig.region = opts.region;
+    if (opts.endpoint) clientConfig.endpoint = opts.endpoint;
+    if (typeof opts.forcePathStyle === 'boolean') clientConfig.forcePathStyle = opts.forcePathStyle;
+    if (opts.credentials) clientConfig.credentials = { ...opts.credentials };
+    
+    this.s3 = opts.client ?? new S3Client(clientConfig);
+    this.signer = {
+      getSignedUrl,
+      cmds: { GetObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command }
+    };
   }
-
+  
   async putObject(input: PutObjectInput): Promise<PutObjectResult> {
     const { PutObjectCommand } = this.signer.cmds;
     const res = await this.s3.send(
       new PutObjectCommand({
-        Bucket: this.opts.bucket,
+        Bucket: this.bucketName,
         Key: input.key,
         Body: input.body as any,
         ContentType: input.contentType,
@@ -43,10 +116,10 @@ export class S3StorageEngine implements StorageEngine {
       url: this.resolvePublicUrl(input.key),
     };
   }
-
+  
   async getObject(key: string): Promise<GetObjectResult> {
     const { GetObjectCommand } = this.signer.cmds;
-    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.opts.bucket, Key: key }));
+    const res = await this.s3.send(new GetObjectCommand({ Bucket: this.bucketName, Key: key }));
     return {
       stream: res.Body as NodeJS.ReadableStream,
       contentType: res.ContentType,
@@ -55,28 +128,28 @@ export class S3StorageEngine implements StorageEngine {
       lastModified: res.LastModified,
     };
   }
-
+  
   async deleteObject(key: string): Promise<void> {
     const { DeleteObjectCommand } = this.signer.cmds;
-    await this.s3.send(new DeleteObjectCommand({ Bucket: this.opts.bucket, Key: key }));
+    await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }));
   }
-
+  
   async copyObject(srcKey: string, destKey: string): Promise<void> {
     const { CopyObjectCommand } = this.signer.cmds;
     await this.s3.send(
       new CopyObjectCommand({
-        Bucket: this.opts.bucket,
-        CopySource: `/${this.opts.bucket}/${srcKey}`,
+        Bucket: this.bucketName,
+        CopySource: `/${ this.bucketName }/${ srcKey }`,
         Key: destKey,
       }),
     );
   }
-
+  
   async moveObject(srcKey: string, destKey: string): Promise<void> {
     await this.copyObject(srcKey, destKey);
     await this.deleteObject(srcKey);
   }
-
+  
   async exists(key: string): Promise<boolean> {
     try {
       await this.getObject(key);
@@ -85,12 +158,12 @@ export class S3StorageEngine implements StorageEngine {
       return false;
     }
   }
-
+  
   async list(prefix: string, cursor?: string, limit = 100): Promise<ListObjectsResult> {
     const { ListObjectsV2Command } = this.signer.cmds;
     const res = await this.s3.send(
       new ListObjectsV2Command({
-        Bucket: this.opts.bucket,
+        Bucket: this.bucketName,
         Prefix: prefix,
         ContinuationToken: cursor,
         MaxKeys: limit,
@@ -101,24 +174,22 @@ export class S3StorageEngine implements StorageEngine {
       nextCursor: res.IsTruncated ? res.NextContinuationToken : undefined,
     };
   }
-
+  
   async getSignedUrl(opts: SignedUrlOptions): Promise<string> {
     const { GetObjectCommand, PutObjectCommand } = this.signer.cmds;
     const Command = opts.action === 'get' ? GetObjectCommand : PutObjectCommand;
     return this.signer.getSignedUrl(
       this.s3,
       new Command({
-        Bucket: this.opts.bucket,
+        Bucket: this.bucketName,
         Key: opts.key,
         ContentType: opts.contentType,
       }),
       { expiresIn: opts.expiresInSeconds ?? 900 },
     );
   }
-
+  
   resolvePublicUrl(key: string): string | undefined {
-    return this.opts.baseUrlPublic
-      ? `${this.opts.baseUrlPublic.replace(/\/$/, '')}/${key}`
-      : undefined;
+    return this.publicBaseUrl ? `${ this.publicBaseUrl }/${ key }` : undefined;
   }
 }
