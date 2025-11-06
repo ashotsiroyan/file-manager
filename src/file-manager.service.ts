@@ -1,14 +1,14 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { StorageEngine } from './interfaces/storage-engine';
 import {
+  FileManagerServiceOptions,
   GetObjectResult,
   ListObjectsResult,
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from './interfaces/types';
+  StorageEngine,
+} from './interfaces';
 import { makeStorageKey } from './utils/file-key.util';
-import { FileManagerServiceOptions } from './interfaces/file-manager-module.interface';
 
 export const FILE_MANAGER_ENGINE = Symbol('FILE_MANAGER_ENGINE');
 export const FILE_MANAGER_OPTIONS = Symbol('FILE_MANAGER_OPTIONS');
@@ -20,15 +20,25 @@ export class FileManagerService {
   constructor(
     @Inject(FILE_MANAGER_ENGINE)
     private readonly engine: StorageEngine,
-    @Optional() @Inject(FILE_MANAGER_OPTIONS)
+    @Optional()
+    @Inject(FILE_MANAGER_OPTIONS)
     private readonly opts?: FileManagerServiceOptions,
   ) {}
 
   makeKey(prefix?: string, originalName?: string) {
-    return makeStorageKey(prefix || this.opts?.defaultPrefix || 'uploads', originalName);
+    return makeStorageKey(
+      prefix || this.opts?.defaultPrefix || 'uploads',
+      originalName,
+    );
   }
 
-  async put(input: Omit<PutObjectInput, 'key'> & { key?: string; prefix?: string; originalName?: string }): Promise<PutObjectResult> {
+  async put(
+    input: Omit<PutObjectInput, 'key'> & {
+      key?: string;
+      prefix?: string;
+      originalName?: string;
+    },
+  ): Promise<PutObjectResult> {
     const key = input.key ?? this.makeKey(input.prefix, input.originalName);
     const res = await this.engine.putObject({
       ...input,
@@ -58,7 +68,11 @@ export class FileManagerService {
     return this.engine.exists(key);
   }
 
-  async list(prefix: string, cursor?: string, limit?: number): Promise<ListObjectsResult> {
+  async list(
+    prefix: string,
+    cursor?: string,
+    limit?: number,
+  ): Promise<ListObjectsResult> {
     return this.engine.list(prefix, cursor, limit);
   }
 

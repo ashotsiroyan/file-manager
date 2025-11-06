@@ -1,14 +1,18 @@
 import { createRequire } from 'module';
-import { StorageEngine } from '../interfaces/storage-engine';
 import {
   GetObjectResult,
   ListObjectsResult,
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../interfaces/types';
-import { ReadableFromBuffer, resolveGcsAuthConfig } from '../utils/engine-auth.util';
-import { GcsEngineOptions, GcsSdkModule } from '../interfaces/gcs.interface';
+  StorageEngine,
+  GcsEngineOptions,
+  GcsSdkModule,
+} from '../interfaces';
+import {
+  ReadableFromBuffer,
+  resolveGcsAuthConfig,
+} from '../utils/engine-auth.util';
 
 let gcsSdkCache: GcsSdkModule | null = null;
 
@@ -31,41 +35,50 @@ export class GcsStorageEngine implements StorageEngine {
   private bucket: any;
   private readonly bucketName: string;
   private readonly publicBaseUrl?: string;
-  
+
   constructor(opts: GcsEngineOptions) {
     if (!opts || !opts.bucket) {
       throw new Error('GCS bucket is required.');
     }
-    
+
     this.bucketName = opts.bucket.trim();
     this.publicBaseUrl = opts.baseUrlPublic
       ? opts.baseUrlPublic.replace(/\/+$/, '')
       : undefined;
-    
+
     if (opts.storage && (opts.storageOptions || opts.auth)) {
-      throw new Error('Provide either opts.storage OR (opts.storageOptions/opts.auth), not both.');
+      throw new Error(
+        'Provide either opts.storage OR (opts.storageOptions/opts.auth), not both.',
+      );
     }
-    
+
     if (opts.auth && 'keyFilename' in opts.auth && 'credentials' in opts.auth) {
-      throw new Error('Provide either auth.keyFilename or auth.credentials, not both.');
+      throw new Error(
+        'Provide either auth.keyFilename or auth.credentials, not both.',
+      );
     }
-    
+
     const { Storage } = loadGcsSdk();
-    
-    const storageConfig: Record<string, any> = { ...(opts.storageOptions || {}) };
+
+    const storageConfig: Record<string, any> = {
+      ...(opts.storageOptions || {}),
+    };
     if (opts.projectId) storageConfig.projectId = opts.projectId;
-    
+
     const authCfg = resolveGcsAuthConfig(opts.auth);
     if (authCfg.credentials?.private_key) {
-      authCfg.credentials.private_key = authCfg.credentials.private_key.replace(/\\n/g, '\n');
+      authCfg.credentials.private_key = authCfg.credentials.private_key.replace(
+        /\\n/g,
+        '\n',
+      );
     }
     Object.assign(storageConfig, authCfg);
-    
+
     this.storage = new Storage(storageConfig);
-    
+
     this.bucket = this.storage.bucket(this.bucketName);
   }
-  
+
   async putObject(input: PutObjectInput): Promise<PutObjectResult> {
     const file = this.bucket.file(input.key);
     const stream = file.createWriteStream({
@@ -76,7 +89,7 @@ export class GcsStorageEngine implements StorageEngine {
       resumable: false,
       predefinedAcl: input.aclPublic ? 'publicRead' : undefined,
     });
-    
+
     const size = await new Promise<number>((resolve, reject) => {
       let bytes = 0;
       const src =
@@ -89,10 +102,10 @@ export class GcsStorageEngine implements StorageEngine {
       stream.on('finish', () => resolve(bytes));
       src.pipe(stream);
     });
-    
+
     return { key: input.key, size, url: this.resolvePublicUrl(input.key) };
   }
-  
+
   async getObject(key: string): Promise<GetObjectResult> {
     const file = this.bucket.file(key);
     const [metadata] = await file.getMetadata();
@@ -105,25 +118,29 @@ export class GcsStorageEngine implements StorageEngine {
       lastModified: metadata.updated ? new Date(metadata.updated) : undefined,
     };
   }
-  
+
   async deleteObject(key: string): Promise<void> {
     await this.bucket.file(key).delete({ ignoreNotFound: true });
   }
-  
+
   async copyObject(srcKey: string, destKey: string): Promise<void> {
     await this.bucket.file(srcKey).copy(this.bucket.file(destKey));
   }
-  
+
   async moveObject(srcKey: string, destKey: string): Promise<void> {
     await this.bucket.file(srcKey).move(this.bucket.file(destKey));
   }
-  
+
   async exists(key: string): Promise<boolean> {
     const [exists] = await this.bucket.file(key).exists();
     return !!exists;
   }
-  
-  async list(prefix: string, cursor?: string, limit = 100): Promise<ListObjectsResult> {
+
+  async list(
+    prefix: string,
+    cursor?: string,
+    limit = 100,
+  ): Promise<ListObjectsResult> {
     const [files, nextQuery] = await this.bucket.getFiles({
       prefix,
       maxResults: limit,
@@ -134,7 +151,7 @@ export class GcsStorageEngine implements StorageEngine {
       nextCursor: nextQuery?.pageToken,
     };
   }
-  
+
   async getSignedUrl(opts: SignedUrlOptions): Promise<string> {
     const file = this.bucket.file(opts.key);
     const action = opts.action === 'get' ? 'read' : 'write';
@@ -145,8 +162,8 @@ export class GcsStorageEngine implements StorageEngine {
     });
     return url;
   }
-  
+
   resolvePublicUrl(key: string): string | undefined {
-    return this.publicBaseUrl ? `${ this.publicBaseUrl }/${ key }` : undefined;
+    return this.publicBaseUrl ? `${this.publicBaseUrl}/${key}` : undefined;
   }
 }

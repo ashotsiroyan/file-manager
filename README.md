@@ -1,7 +1,9 @@
 # 📦 @ashotsiroyan/file-manager
 
-A **modular file management system for NestJS** supporting **Local**, **AWS S3**, and **Google Cloud Storage (GCS)** backends.  
-It provides a unified API for uploading, downloading, listing, deleting, and signing files — all with a clean, injectable design.
+A **modular file management system for NestJS** supporting **Local**, **AWS S3**, and **Google Cloud Storage (GCS)**
+backends.  
+It provides a unified API for uploading, downloading, listing, deleting, and signing files — all with a clean,
+injectable design.
 
 ---
 
@@ -11,7 +13,6 @@ It provides a unified API for uploading, downloading, listing, deleting, and sig
 - 📁 **Supports multiple storage engines:** Local, S3, GCS
 - 🚀 **Streaming uploads/downloads** (no buffering)
 - 🔐 **Signed URL generation** for direct-to-cloud uploads
-- 🧩 **Optional REST controller** (`/files`) for quick integration
 - 🧠 **Extensible interface (`StorageEngine`)** for custom backends
 - 🔒 **Security-first design** — control access and serve privately
 
@@ -35,12 +36,12 @@ npm install --save @google-cloud/storage
 ## 🧱 Quick Start (Local Storage)
 
 **app.module.ts**
+
 ```ts
 import { Module } from '@nestjs/common';
 import {
   FileManagerModule,
   LocalStorageEngine,
-  FileManagerController,
 } from '@ashotsiroyan/file-manager';
 
 @Module({
@@ -54,17 +55,18 @@ import {
       publicReadByDefault: true,
     }),
   ],
-  controllers: [FileManagerController], // optional
 })
 export class AppModule {}
 ```
 
 `forRoot` receives a single configuration object:
+
 - `engine` (required): any `StorageEngine`
 - `defaultPrefix` / `publicReadByDefault` (optional service defaults)
 - `global` (optional): register the module globally across your app
 
 **main.ts**
+
 ```ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
@@ -77,35 +79,8 @@ async function bootstrap() {
   await app.listen(3000);
   console.log('🚀 Running at http://localhost:3000');
 }
+
 bootstrap();
-```
-
----
-
-## 🧩 REST Endpoints (optional)
-
-If you include `FileManagerController`, these endpoints are available:
-
-| Method  | Endpoint           | Description                        |
-|----------|--------------------|------------------------------------|
-| `POST`   | `/files`           | Upload file (multipart/form-data)  |
-| `GET`    | `/files`           | List files (with prefix/filter)    |
-| `GET`    | `/files/:key(*)`   | Stream file from backend           |
-| `DELETE` | `/files/:key(*)`   | Delete a file                      |
-
-### Example Upload
-```bash
-curl -F "file=@photo.jpg" http://localhost:3000/files
-```
-
-Response:
-```json
-{
-  "key": "uploads/photo-abc123.jpg",
-  "url": "http://localhost:3000/static/uploads/photo-abc123.jpg",
-  "size": 28499,
-  "contentType": "image/jpeg"
-}
 ```
 
 ---
@@ -226,12 +201,12 @@ import { FileManagerModule, S3StorageEngine } from '@ashotsiroyan/file-manager';
 export class AppModule {}
 ```
 
-When using `forRootAsync`, ensure the factory returns the same shape as `forRoot` (an object with at least an `engine` property, plus any optional defaults or `global` flag).
+When using `forRootAsync`, ensure the factory returns the same shape as `forRoot` (an object with at least an `engine`
+property, plus any optional defaults or `global` flag).
 
 ---
 
 ## 🌍 Using Google Cloud Storage (`forRootAsync`)
-
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -264,11 +239,14 @@ import { FileManagerModule, GcsStorageEngine } from '@ashotsiroyan/file-manager'
 export class AppModule {}
 ```
 
-The `GcsStorageEngine` can work with either a key file (`GOOGLE_APPLICATION_CREDENTIALS`), a JSON blob (`GOOGLE_APPLICATION_CREDENTIALS_JSON`, raw or base64), or explicit `clientEmail` / `privateKey` pairs.
+The `GcsStorageEngine` can work with either a key file (`GOOGLE_APPLICATION_CREDENTIALS`), a JSON blob (
+`GOOGLE_APPLICATION_CREDENTIALS_JSON`, raw or base64), or explicit `clientEmail` / `privateKey` pairs.
 
-> ✅ You can also supply a preconfigured `Storage` instance (via `storage`) or additional `storageOptions` if you need advanced Google Cloud Storage setup.
+> ✅ You can also supply a preconfigured `Storage` instance (via `storage`) or additional `storageOptions` if you need
+> advanced Google Cloud Storage setup.
 
-> ✅ For AWS you can pass a ready-made `S3Client` through the `client` option or inject extra configuration with `clientConfig`.
+> ✅ For AWS you can pass a ready-made `S3Client` through the `client` option or inject extra configuration with
+`clientConfig`.
 
 ---
 
@@ -286,6 +264,7 @@ console.log('Upload directly to:', url);
 ```
 
 For downloads:
+
 ```ts
 await this.files.signedUrl({ key, action: 'get', expiresInSeconds: 300 });
 ```
@@ -298,7 +277,12 @@ await this.files.signedUrl({ key, action: 'get', expiresInSeconds: 300 });
 
 ```ts
 @Get('files/:key(*)')
-async download(@Param('key') key: string, @Res() res: Response) {
+async
+download(@Param('key')
+key: string, @Res()
+res: Response
+)
+{
   const obj = await this.files.get(key);
   if (obj.contentType) res.setHeader('Content-Type', obj.contentType);
   if (obj.size) res.setHeader('Content-Length', String(obj.size));
@@ -307,6 +291,7 @@ async download(@Param('key') key: string, @Res() res: Response) {
 ```
 
 ✅ **Why stream via backend?**
+
 - Authorization & ownership checks
 - Metrics & audit logs
 - Prevent hotlinking
@@ -318,6 +303,7 @@ async download(@Param('key') key: string, @Res() res: Response) {
 ## 🧩 Advanced Usage
 
 ### Dynamic engine setup
+
 ```ts
 FileManagerModule.forRootAsync({
   useFactory: async () => ({
@@ -328,6 +314,7 @@ FileManagerModule.forRootAsync({
 ```
 
 ### Custom engine
+
 ```ts
 class MyEngine implements StorageEngine {
   async putObject() {
@@ -348,9 +335,9 @@ class MyEngine implements StorageEngine {
 
 ## ⚡ Troubleshooting
 
-| Issue | Cause | Fix |
-|--------|-------|-----|
-| `Cannot find module '@aws-sdk/...` | Missing dependency | Install optional deps |
-| `Forbidden` on S3 | Wrong IAM policy | Update bucket permissions |
-| `ENOENT` local | Missing folder | Check `baseDir` |
-| `GCS invalid_grant` | Bad credentials | Fix service account JSON |
+| Issue                              | Cause              | Fix                       |
+|------------------------------------|--------------------|---------------------------|
+| `Cannot find module '@aws-sdk/...` | Missing dependency | Install optional deps     |
+| `Forbidden` on S3                  | Wrong IAM policy   | Update bucket permissions |
+| `ENOENT` local                     | Missing folder     | Check `baseDir`           |
+| `GCS invalid_grant`                | Bad credentials    | Fix service account JSON  |

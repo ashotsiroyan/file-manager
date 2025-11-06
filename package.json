@@ -1,6 +1,8 @@
 {
   "name": "@ashotsiroyan/file-manager",
-  "version": "1.0.9",
+  "version": "1.0.10",
+  "description": "Modular NestJS file manager with pluggable local, AWS S3, and Google Cloud Storage engines.",
+  "author": "Ashot Siroyan",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -13,7 +15,9 @@
     "url": "git://github.com/ashotsiroyan/file-manager.git"
   },
   "keywords": [
-    "file-manager", "s3", "gcc"
+    "file-manager",
+    "s3",
+    "gcc"
   ],
   "license": "MIT",
   "sideEffects": false,
@@ -44,11 +48,13 @@
   "devDependencies": {
     "@types/mime-types": "^2.1.4",
     "@types/node": "^20.11.30",
+    "prettier": "^3.6.2",
     "tslib": "^2.6.2",
     "typescript": "^5.6.3"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "format": "prettier --write \"src/**/*.ts\""
   }
 }

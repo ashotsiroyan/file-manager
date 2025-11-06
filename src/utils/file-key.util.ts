@@ -15,5 +15,7 @@ export function makeStorageKey(prefix: string, originalName?: string): string {
   const ext = originalName ? extname(originalName) : '';
   const name = originalName ? safeSlug(originalName.replace(ext, '')) : '';
   const file = name ? `${name}-${id}${ext}` : `${id}${ext}`;
-  return [prefix.replace(/\/+$/, '').replace(/^\/+/, '').trim(), file].filter(Boolean).join('/');
+  return [prefix.replace(/\/+$/, '').replace(/^\/+/, '').trim(), file]
+    .filter(Boolean)
+    .join('/');
 }

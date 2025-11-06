@@ -1,9 +1,14 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
-import { FILE_MANAGER_ENGINE, FILE_MANAGER_OPTIONS, FileManagerService } from './file-manager.service';
+import {
+  FILE_MANAGER_ENGINE,
+  FILE_MANAGER_OPTIONS,
+  FileManagerService,
+} from './file-manager.service';
 import {
   FileManagerModuleAsyncOptions,
-  FileManagerModuleFactoryResult, FileManagerModuleOptions
-} from './interfaces/file-manager-module.interface';
+  FileManagerModuleFactoryResult,
+  FileManagerModuleOptions,
+} from './interfaces';
 
 const FILE_MANAGER_FACTORY_RESULT = Symbol('FILE_MANAGER_FACTORY_RESULT');
 
@@ -23,26 +28,27 @@ export class FileManagerModule {
       exports: [FileManagerService],
     };
   }
-  
-  static forRootAsync(
-    options: FileManagerModuleAsyncOptions
-  ): DynamicModule {
+
+  static forRootAsync(options: FileManagerModuleAsyncOptions): DynamicModule {
     if (!options?.useFactory) {
-      throw new Error('FileManagerModule.forRootAsync requires a useFactory function.');
+      throw new Error(
+        'FileManagerModule.forRootAsync requires a useFactory function.',
+      );
     }
-    
+
     const factoryResultProvider: Provider<FileManagerModuleFactoryResult> = {
       provide: FILE_MANAGER_FACTORY_RESULT,
-      useFactory: async (...args: any[]) => Promise.resolve(options.useFactory!(...args)),
+      useFactory: async (...args: any[]) =>
+        Promise.resolve(options.useFactory!(...args)),
       inject: options.inject || [],
     };
-    
+
     const engineProvider: Provider = {
       provide: FILE_MANAGER_ENGINE,
       useFactory: (result: FileManagerModuleFactoryResult) => result.engine,
       inject: [FILE_MANAGER_FACTORY_RESULT],
     };
-    
+
     const optionsProvider: Provider = {
       provide: FILE_MANAGER_OPTIONS,
       useFactory: (result: FileManagerModuleFactoryResult) => {
@@ -51,12 +57,17 @@ export class FileManagerModule {
       },
       inject: [FILE_MANAGER_FACTORY_RESULT],
     };
-    
+
     return {
       global: !!options.global,
       module: FileManagerModule,
       imports: options.imports,
-      providers: [factoryResultProvider, engineProvider, optionsProvider, FileManagerService],
+      providers: [
+        factoryResultProvider,
+        engineProvider,
+        optionsProvider,
+        FileManagerService,
+      ],
       exports: [FileManagerService],
     };
   }

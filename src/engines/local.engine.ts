@@ -1,21 +1,22 @@
-import { StorageEngine } from '../interfaces/storage-engine';
 import {
   GetObjectResult,
   ListObjectsResult,
+  LocalEngineOptions,
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
-} from '../interfaces/types';
-import { createReadStream, createWriteStream, promises as fsp } from 'fs';
-import { mkdir, stat, access, readdir, rename } from 'fs/promises';
-import { constants } from 'fs';
-import { join, dirname, resolve } from 'path';
+  StorageEngine,
+} from '../interfaces';
+import {
+  constants,
+  createReadStream,
+  createWriteStream,
+  promises as fsp,
+} from 'fs';
+import { access, mkdir, readdir, rename, stat } from 'fs/promises';
+import { dirname, join, resolve } from 'path';
 import { lookup as mimeLookup } from 'mime-types';
-
-export interface LocalEngineOptions {
-  baseDir: string;
-  publicBaseUrl?: string;
-}
+import { ReadableFromBuffer } from '../utils/engine-auth.util';
 
 export class LocalStorageEngine implements StorageEngine {
   constructor(private readonly opts: LocalEngineOptions) {}
@@ -48,7 +49,9 @@ export class LocalStorageEngine implements StorageEngine {
     return {
       key: input.key,
       size,
-      url: this.opts.publicBaseUrl ? `${this.opts.publicBaseUrl}/${input.key}` : undefined,
+      url: this.opts.publicBaseUrl
+        ? `${this.opts.publicBaseUrl}/${input.key}`
+        : undefined,
     };
   }
 
@@ -83,7 +86,11 @@ export class LocalStorageEngine implements StorageEngine {
     }
   }
 
-  async list(prefix: string, cursor?: string, limit = 100): Promise<ListObjectsResult> {
+  async list(
+    prefix: string,
+    cursor?: string,
+    limit = 100,
+  ): Promise<ListObjectsResult> {
     const dir = this.abs(prefix);
     let items: string[] = [];
     try {
@@ -102,7 +109,8 @@ export class LocalStorageEngine implements StorageEngine {
 
     const start = cursor ? parseInt(cursor, 10) : 0;
     const slice = items.slice(start, start + limit);
-    const nextCursor = start + limit < items.length ? String(start + limit) : undefined;
+    const nextCursor =
+      start + limit < items.length ? String(start + limit) : undefined;
     return { keys: slice, nextCursor };
   }
 
@@ -113,14 +121,8 @@ export class LocalStorageEngine implements StorageEngine {
   }
 
   resolvePublicUrl(key: string): string | undefined {
-    return this.opts.publicBaseUrl ? `${this.opts.publicBaseUrl}/${key}` : undefined;
+    return this.opts.publicBaseUrl
+      ? `${this.opts.publicBaseUrl}/${key}`
+      : undefined;
   }
-}
-
-import { Readable } from 'stream';
-function ReadableFromBuffer(buf: Buffer | Uint8Array): Readable {
-  const r = new Readable();
-  r.push(buf);
-  r.push(null);
-  return r;
 }

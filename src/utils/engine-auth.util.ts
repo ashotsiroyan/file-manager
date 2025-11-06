@@ -1,26 +1,28 @@
 import { Readable } from 'stream';
-import { GcsAuthOptions } from '../interfaces/gcs.interface';
+import { GcsAuthOptions } from '../interfaces';
 
 export function resolveGcsAuthConfig(auth?: GcsAuthOptions) {
   if (!auth) return {};
-  
+
   const config: Record<string, any> = {};
   const keyFilename = auth.keyFilename;
   if (keyFilename) {
     config.keyFilename = keyFilename;
   }
-  
+
   const rawCredentials = auth.keyFileJson;
   const directCredentials = auth.credentials;
   const clientEmail = auth.clientEmail;
   const privateKeyRaw = auth.privateKey;
-  
-  let credentials: any | undefined = directCredentials ? { ...directCredentials } : undefined;
-  
+
+  let credentials: any | undefined = directCredentials
+    ? { ...directCredentials }
+    : undefined;
+
   if (rawCredentials) {
     credentials = parseGcsCredentials(rawCredentials);
   }
-  
+
   if (clientEmail || privateKeyRaw) {
     if (!clientEmail || !privateKeyRaw) {
       throw new Error(
@@ -32,11 +34,11 @@ export function resolveGcsAuthConfig(auth?: GcsAuthOptions) {
       private_key: normalizePrivateKey(privateKeyRaw),
     };
   }
-  
+
   if (credentials) {
     config.credentials = credentials;
   }
-  
+
   return config;
 }
 
@@ -53,10 +55,12 @@ function parseGcsCredentials(raw: string) {
     try {
       text = Buffer.from(text, 'base64').toString('utf8').trim();
     } catch {
-      throw new Error('Failed to decode base64 GCS credentials JSON. Provide valid JSON or base64 encoded JSON.');
+      throw new Error(
+        'Failed to decode base64 GCS credentials JSON. Provide valid JSON or base64 encoded JSON.',
+      );
     }
   }
-  
+
   try {
     const parsed = JSON.parse(text);
     if (parsed.private_key) {
@@ -64,7 +68,9 @@ function parseGcsCredentials(raw: string) {
     }
     return parsed;
   } catch {
-    throw new Error('Invalid GCS credentials JSON provided. Ensure the JSON is correctly formatted.');
+    throw new Error(
+      'Invalid GCS credentials JSON provided. Ensure the JSON is correctly formatted.',
+    );
   }
 }
 
