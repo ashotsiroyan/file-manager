@@ -7,23 +7,21 @@ import {
   PutObjectResult,
   SignedUrlOptions,
 } from './interfaces/types';
-import { makeStorageKey } from './file-key.util';
+import { makeStorageKey } from './utils/file-key.util';
+import { FileManagerServiceOptions } from './interfaces/file-manager-module.interface';
 
 export const FILE_MANAGER_ENGINE = Symbol('FILE_MANAGER_ENGINE');
 export const FILE_MANAGER_OPTIONS = Symbol('FILE_MANAGER_OPTIONS');
-
-export interface FileManagerModuleOptions {
-  defaultPrefix?: string;
-  publicReadByDefault?: boolean;
-}
 
 @Injectable()
 export class FileManagerService {
   private readonly logger = new Logger(FileManagerService.name);
 
   constructor(
-    @Inject(FILE_MANAGER_ENGINE) private readonly engine: StorageEngine,
-    @Optional() @Inject(FILE_MANAGER_OPTIONS) private readonly opts?: FileManagerModuleOptions,
+    @Inject(FILE_MANAGER_ENGINE)
+    private readonly engine: StorageEngine,
+    @Optional() @Inject(FILE_MANAGER_OPTIONS)
+    private readonly opts?: FileManagerServiceOptions,
   ) {}
 
   makeKey(prefix?: string, originalName?: string) {

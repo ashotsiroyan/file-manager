@@ -1,69 +1,61 @@
-import { DynamicModule, Module, ModuleMetadata, Provider } from '@nestjs/common';
-import { FileManagerService, FILE_MANAGER_ENGINE, FILE_MANAGER_OPTIONS, FileManagerModuleOptions } from './file-manager.service';
-import { StorageEngine } from './interfaces/storage-engine';
-
-export interface FileManagerModuleFactoryResult {
-  engine: StorageEngine;
-  options?: FileManagerModuleOptions;
-}
-
-export interface FileManagerModuleAsyncOptions {
-  imports?: ModuleMetadata['imports'];
-  inject?: any[];
-  useFactory: (...args: any[]) => Promise<FileManagerModuleFactoryResult> | FileManagerModuleFactoryResult;
-}
+import { DynamicModule, Module, Provider } from '@nestjs/common';
+import { FILE_MANAGER_ENGINE, FILE_MANAGER_OPTIONS, FileManagerService } from './file-manager.service';
+import {
+  FileManagerModuleAsyncOptions,
+  FileManagerModuleFactoryResult, FileManagerModuleOptions
+} from './interfaces/file-manager-module.interface';
 
 const FILE_MANAGER_FACTORY_RESULT = Symbol('FILE_MANAGER_FACTORY_RESULT');
 
 @Module({})
 export class FileManagerModule {
-  static forRoot(engine: StorageEngine, options?: FileManagerModuleOptions): DynamicModule {
+  static forRoot(options: FileManagerModuleOptions): DynamicModule {
+    const { engine, ...rest } = options;
     const providers: Provider[] = [
       { provide: FILE_MANAGER_ENGINE, useValue: engine },
-      { provide: FILE_MANAGER_OPTIONS, useValue: options || {} },
+      { provide: FILE_MANAGER_OPTIONS, useValue: rest || {} },
       FileManagerService,
     ];
     return {
+      global: !!options.global,
       module: FileManagerModule,
       providers,
       exports: [FileManagerService],
     };
   }
-
+  
   static forRootAsync(
-    options:
-      | FileManagerModuleAsyncOptions
-      | (() => Promise<FileManagerModuleFactoryResult> | FileManagerModuleFactoryResult),
+    options: FileManagerModuleAsyncOptions
   ): DynamicModule {
-    const asyncOptions: FileManagerModuleAsyncOptions =
-      typeof options === 'function' ? { useFactory: options } : options;
-
-    if (!asyncOptions?.useFactory) {
+    if (!options?.useFactory) {
       throw new Error('FileManagerModule.forRootAsync requires a useFactory function.');
     }
-
-    const factoryResultProvider: Provider = {
+    
+    const factoryResultProvider: Provider<FileManagerModuleFactoryResult> = {
       provide: FILE_MANAGER_FACTORY_RESULT,
-      useFactory: async (...args: any[]) =>
-        await Promise.resolve(asyncOptions.useFactory(...args)),
-      inject: asyncOptions.inject || [],
+      useFactory: async (...args: any[]) => Promise.resolve(options.useFactory!(...args)),
+      inject: options.inject || [],
     };
-
+    
     const engineProvider: Provider = {
       provide: FILE_MANAGER_ENGINE,
       useFactory: (result: FileManagerModuleFactoryResult) => result.engine,
       inject: [FILE_MANAGER_FACTORY_RESULT],
     };
-
+    
     const optionsProvider: Provider = {
       provide: FILE_MANAGER_OPTIONS,
-      useFactory: (result: FileManagerModuleFactoryResult) => result.options || {},
+      useFactory: (result: FileManagerModuleFactoryResult) => {
+        const { engine, ...rest } = result;
+        return rest;
+      },
       inject: [FILE_MANAGER_FACTORY_RESULT],
     };
-
+    
     return {
+      global: !!options.global,
       module: FileManagerModule,
-      imports: asyncOptions.imports,
+      imports: options.imports,
       providers: [factoryResultProvider, engineProvider, optionsProvider, FileManagerService],
       exports: [FileManagerService],
     };

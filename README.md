@@ -45,18 +45,24 @@ import {
 
 @Module({
   imports: [
-    FileManagerModule.forRoot(
-      new LocalStorageEngine({
+    FileManagerModule.forRoot({
+      engine: new LocalStorageEngine({
         baseDir: './uploads',
         publicBaseUrl: 'http://localhost:3000/static',
       }),
-      { defaultPrefix: 'uploads', publicReadByDefault: true },
-    ),
+      defaultPrefix: 'uploads',
+      publicReadByDefault: true,
+    }),
   ],
   controllers: [FileManagerController], // optional
 })
 export class AppModule {}
 ```
+
+`forRoot` receives a single configuration object:
+- `engine` (required): any `StorageEngine`
+- `defaultPrefix` / `publicReadByDefault` (optional service defaults)
+- `global` (optional): register the module globally across your app
 
 **main.ts**
 ```ts
@@ -211,16 +217,16 @@ import { FileManagerModule, S3StorageEngine } from '@ashotsiroyan/file-manager';
             sessionToken: config.get('S3_SESSION_TOKEN'),
           },
         }),
-        options: {
-          defaultPrefix: 'uploads',
-          publicReadByDefault: true,
-        },
+        defaultPrefix: 'uploads',
+        publicReadByDefault: true,
       }),
     }),
   ],
 })
 export class AppModule {}
 ```
+
+When using `forRootAsync`, ensure the factory returns the same shape as `forRoot` (an object with at least an `engine` property, plus any optional defaults or `global` flag).
 
 ---
 
@@ -249,10 +255,8 @@ import { FileManagerModule, GcsStorageEngine } from '@ashotsiroyan/file-manager'
             privateKey: config.get('GCS_PRIVATE_KEY'),
           },
         }),
-        options: {
-          defaultPrefix: 'uploads',
-          publicReadByDefault: true,
-        },
+        defaultPrefix: 'uploads',
+        publicReadByDefault: true,
       }),
     }),
   ],
@@ -315,10 +319,12 @@ async download(@Param('key') key: string, @Res() res: Response) {
 
 ### Dynamic engine setup
 ```ts
-FileManagerModule.forRootAsync(async () => ({
-  engine: new LocalStorageEngine({ baseDir: './data' }),
-  options: { defaultPrefix: 'user_uploads' },
-}));
+FileManagerModule.forRootAsync({
+  useFactory: async () => ({
+    engine: new LocalStorageEngine({ baseDir: './data' }),
+    defaultPrefix: 'user_uploads',
+  }),
+});
 ```
 
 ### Custom engine

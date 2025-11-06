@@ -7,4 +7,4 @@ export * from './engines/local.engine';
 export * from './engines/s3.engine';
 export * from './engines/gcs.engine';
 
-export * from './file-key.util';
+export * from './utils/file-key.util';

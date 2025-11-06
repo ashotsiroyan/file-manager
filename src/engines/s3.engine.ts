@@ -7,23 +7,15 @@ import {
   PutObjectResult,
   SignedUrlOptions,
 } from '../interfaces/types';
+import { AwsSdkModules, S3EngineOptions } from '../interfaces/s3.interface';
 
-type AwsSdkModules = {
-  S3Client: any;
-  GetObjectCommand: any;
-  PutObjectCommand: any;
-  CopyObjectCommand: any;
-  DeleteObjectCommand: any;
-  ListObjectsV2Command: any;
-  getSignedUrl: any;
-};
 
 let awsSdkCache: AwsSdkModules | null = null;
 
 function loadAwsSdk(): AwsSdkModules {
   if (awsSdkCache) return awsSdkCache;
   const requireFn = createRequire(__filename);
-
+  
   try {
     const client = requireFn('@aws-sdk/client-s3');
     const presigner = requireFn('@aws-sdk/s3-request-presigner');
@@ -44,23 +36,6 @@ function loadAwsSdk(): AwsSdkModules {
   }
 }
 
-export interface S3CredentialsOptions {
-  accessKeyId: string;
-  secretAccessKey: string;
-  sessionToken?: string;
-}
-
-export interface S3EngineOptions {
-  bucket: string;
-  region?: string;
-  baseUrlPublic?: string;
-  endpoint?: string;
-  forcePathStyle?: boolean;
-  credentials?: S3CredentialsOptions;
-  client?: any;
-  clientConfig?: Record<string, any>;
-}
-
 export class S3StorageEngine implements StorageEngine {
   private s3: any;
   private signer: any;
@@ -68,6 +43,10 @@ export class S3StorageEngine implements StorageEngine {
   private readonly publicBaseUrl?: string;
   
   constructor(opts: S3EngineOptions) {
+    if (!opts || !opts.bucket) {
+      throw new Error('S3 bucket is required.');
+    }
+    
     const {
       S3Client,
       GetObjectCommand,
@@ -77,10 +56,7 @@ export class S3StorageEngine implements StorageEngine {
       ListObjectsV2Command,
       getSignedUrl,
     } = loadAwsSdk();
-
-    if (!opts.bucket) {
-      throw new Error('S3 bucket is required.');
-    }
+    
     this.bucketName = opts.bucket;
     
     this.publicBaseUrl = opts.baseUrlPublic ? opts.baseUrlPublic.replace(/\/$/, '') : undefined;
