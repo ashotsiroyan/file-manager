@@ -1,6 +1,6 @@
 {
   "name": "@ashotsiroyan/file-manager",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Modular NestJS file manager with pluggable local, AWS S3, and Google Cloud Storage engines.",
   "author": "Ashot Siroyan",
   "main": "./dist/index.js",
@@ -17,7 +17,7 @@
   "keywords": [
     "file-manager",
     "s3",
-    "gcc"
+    "gcs"
   ],
   "license": "MIT",
   "sideEffects": false,
