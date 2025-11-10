@@ -25,6 +25,7 @@ function loadAwsSdk(): AwsSdkModules {
       PutObjectCommand: client.PutObjectCommand,
       CopyObjectCommand: client.CopyObjectCommand,
       DeleteObjectCommand: client.DeleteObjectCommand,
+      DeleteObjectsCommand: client.DeleteObjectsCommand,
       ListObjectsV2Command: client.ListObjectsV2Command,
       getSignedUrl: presigner.getSignedUrl,
     };
@@ -53,6 +54,7 @@ export class S3StorageEngine implements StorageEngine {
       PutObjectCommand,
       CopyObjectCommand,
       DeleteObjectCommand,
+      DeleteObjectsCommand,
       ListObjectsV2Command,
       getSignedUrl,
     } = loadAwsSdk();
@@ -78,6 +80,7 @@ export class S3StorageEngine implements StorageEngine {
         PutObjectCommand,
         CopyObjectCommand,
         DeleteObjectCommand,
+        DeleteObjectsCommand,
         ListObjectsV2Command,
       },
     };
@@ -121,6 +124,39 @@ export class S3StorageEngine implements StorageEngine {
     await this.s3.send(
       new DeleteObjectCommand({ Bucket: this.bucketName, Key: key }),
     );
+  }
+
+  async deleteDirectory(prefix: string): Promise<void> {
+    const { ListObjectsV2Command, DeleteObjectsCommand } = this.signer.cmds;
+    let cursor: string | undefined;
+
+    do {
+      const res = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucketName,
+          Prefix: prefix,
+          ContinuationToken: cursor,
+          MaxKeys: 1000,
+        }),
+      );
+
+      const keys = (res.Contents || [])
+        .map((o: any) => o.Key as string)
+        .filter(Boolean);
+
+      if (keys.length) {
+        await this.s3.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucketName,
+            Delete: {
+              Objects: keys.map((key: string) => ({ Key: key })),
+            },
+          }),
+        );
+      }
+
+      cursor = res.IsTruncated ? res.NextContinuationToken : undefined;
+    } while (cursor);
   }
 
   async copyObject(srcKey: string, destKey: string): Promise<void> {

@@ -16,6 +16,8 @@ export interface StorageEngine {
   getObject(key: string): Promise<GetObjectResult>;
   /** Permanently remove an object. */
   deleteObject(key: string): Promise<void>;
+  /** Remove every object stored under the provided prefix/directory. */
+  deleteDirectory(prefix: string): Promise<void>;
   /** Create a logical copy of an object. */
   copyObject(srcKey: string, destKey: string): Promise<void>;
   /** Move/rename an object within the backend. */

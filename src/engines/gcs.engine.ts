@@ -123,6 +123,10 @@ export class GcsStorageEngine implements StorageEngine {
     await this.bucket.file(key).delete({ ignoreNotFound: true });
   }
 
+  async deleteDirectory(prefix: string): Promise<void> {
+    await this.bucket.deleteFiles({ prefix, force: true });
+  }
+
   async copyObject(srcKey: string, destKey: string): Promise<void> {
     await this.bucket.file(srcKey).copy(this.bucket.file(destKey));
   }

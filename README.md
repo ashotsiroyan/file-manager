@@ -63,6 +63,7 @@ export class AppModule {}
 
 - `engine` (required): any `StorageEngine`
 - `defaultPrefix` / `publicReadByDefault` (optional service defaults)
+- `maxConcurrentOps` (optional): cap simultaneous storage calls to avoid throttling
 - `global` (optional): register the module globally across your app
 
 **main.ts**
@@ -166,6 +167,9 @@ export class AvatarController {
 > For large files, use diskStorage() and fs.createReadStream(file.path) instead of buffers.
 
 > For small files, memoryStorage() + Readable.from(file.buffer) is fastest.
+
+Need to remove every file inside a logical folder? Call `await this.files.deleteDirectory('avatars/user123/')` to wipe
+an entire prefix in a single operation, regardless of the underlying storage engine.
 
 ---
 
@@ -330,6 +334,18 @@ class MyEngine implements StorageEngine {
   }
 }
 ```
+
+### Throttle storage calls
+
+```ts
+FileManagerModule.forRoot({
+  engine: new S3StorageEngine({...}),
+  maxConcurrentOps: 5,
+});
+```
+
+Setting `maxConcurrentOps` wraps every service method in a lightweight semaphore, keeping only the specified number of
+simultaneous storage requests active — helpful for S3/GCS rate limits or local I/O pressure.
 
 ---
 

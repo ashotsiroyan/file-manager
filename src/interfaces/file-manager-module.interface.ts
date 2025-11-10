@@ -37,6 +37,8 @@ export interface FileManagerModuleFactoryResult {
   defaultPrefix?: string;
   /** Default ACL flag applied to uploads when `aclPublic` is omitted. */
   publicReadByDefault?: boolean;
+  /** Max number of concurrent storage operations allowed. */
+  maxConcurrentOps?: number;
 }
 
 /**
@@ -47,4 +49,6 @@ export interface FileManagerServiceOptions {
   defaultPrefix?: string;
   /** Default ACL flag applied to uploads when `aclPublic` is omitted. */
   publicReadByDefault?: boolean;
+  /** Max number of concurrent storage operations allowed. */
+  maxConcurrentOps?: number;
 }

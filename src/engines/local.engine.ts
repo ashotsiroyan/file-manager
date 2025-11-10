@@ -67,6 +67,10 @@ export class LocalStorageEngine implements StorageEngine {
     await fsp.rm(this.abs(key), { force: true });
   }
 
+  async deleteDirectory(prefix: string): Promise<void> {
+    await fsp.rm(this.abs(prefix), { recursive: true, force: true });
+  }
+
   async copyObject(srcKey: string, destKey: string): Promise<void> {
     await mkdir(dirname(this.abs(destKey)), { recursive: true });
     await fsp.copyFile(this.abs(srcKey), this.abs(destKey));
