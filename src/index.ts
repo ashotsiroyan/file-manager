@@ -8,3 +8,5 @@ export * from './engines/s3.engine';
 export * from './engines/gcs.engine';
 
 export * from './utils/file-key.util';
+
+export * from './decorators';
