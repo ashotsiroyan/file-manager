@@ -2,11 +2,21 @@ import { ModuleMetadata } from '@nestjs/common';
 import { StorageEngine } from './storage-engine';
 
 /**
+ * Shared configuration returned by sync/async factories.
+ */
+export interface FileManagerModuleFactoryResult
+  extends FileManagerServiceOptions {
+  /** Storage backend implementation used by the service. */
+  engine: StorageEngine;
+}
+
+/**
  * Synchronous registration options for `FileManagerModule.forRoot`.
- * Extends the factory result with the ability to mark the module as global.
  */
 export interface FileManagerModuleOptions
   extends FileManagerModuleFactoryResult {
+  /** Unique storage identifier when registering multiple instances. */
+  name?: string;
   /** Register the module globally across the Nest application. */
   global?: boolean;
 }
@@ -15,6 +25,8 @@ export interface FileManagerModuleOptions
  * Asynchronous registration options for `FileManagerModule.forRootAsync`.
  */
 export interface FileManagerModuleAsyncOptions {
+  /** Unique storage identifier when registering multiple instances. */
+  name?: string;
   /** Register the module globally across the Nest application. */
   global?: boolean;
   /** Modules to import when resolving the async factory. */
@@ -25,20 +37,6 @@ export interface FileManagerModuleAsyncOptions {
   useFactory: (
     ...args: any[]
   ) => Promise<FileManagerModuleFactoryResult> | FileManagerModuleFactoryResult;
-}
-
-/**
- * Result expected from both sync and async factories configuring the module.
- */
-export interface FileManagerModuleFactoryResult {
-  /** Storage backend implementation used by the service. */
-  engine: StorageEngine;
-  /** Prefix used when generating keys without an explicit prefix. */
-  defaultPrefix?: string;
-  /** Default ACL flag applied to uploads when `aclPublic` is omitted. */
-  publicReadByDefault?: boolean;
-  /** Max number of concurrent storage operations allowed. */
-  maxConcurrentOps?: number;
 }
 
 /**

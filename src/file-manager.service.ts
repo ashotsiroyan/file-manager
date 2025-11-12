@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   FileManagerServiceOptions,
   GetObjectResult,
@@ -11,19 +11,12 @@ import {
 import { makeStorageKey } from './utils/file-key.util';
 import { AsyncSemaphore } from './utils/async-semaphore';
 
-export const FILE_MANAGER_ENGINE = Symbol('FILE_MANAGER_ENGINE');
-export const FILE_MANAGER_OPTIONS = Symbol('FILE_MANAGER_OPTIONS');
-
 @Injectable()
 export class FileManagerService {
-  private readonly logger = new Logger(FileManagerService.name);
   private readonly semaphore?: AsyncSemaphore;
 
   constructor(
-    @Inject(FILE_MANAGER_ENGINE)
     private readonly engine: StorageEngine,
-    @Optional()
-    @Inject(FILE_MANAGER_OPTIONS)
     private readonly opts?: FileManagerServiceOptions,
   ) {
     const maxConcurrentOps = opts?.maxConcurrentOps;
@@ -108,4 +101,28 @@ export class FileManagerService {
     }
     return this.semaphore.run(task);
   }
+}
+
+const serviceTokenRegistry = new Map<string, symbol>();
+
+export function getFileManagerServiceToken(
+  name?: string,
+): symbol | typeof FileManagerService {
+  if (!name) {
+    return FileManagerService;
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error('Storage name cannot be an empty string.');
+  }
+
+  if (!serviceTokenRegistry.has(trimmed)) {
+    serviceTokenRegistry.set(
+      trimmed,
+      Symbol(`FILE_MANAGER_SERVICE:${trimmed}`),
+    );
+  }
+
+  return serviceTokenRegistry.get(trimmed)!;
 }

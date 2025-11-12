@@ -193,7 +193,6 @@ import { FileManagerModule, S3StorageEngine } from '@ashotsiroyan/file-manager';
           credentials: {
             accessKeyId: config.get('S3_ACCESS_KEY_ID'),
             secretAccessKey: config.get('S3_SECRET_ACCESS_KEY'),
-            sessionToken: config.get('S3_SESSION_TOKEN'),
           },
         }),
         defaultPrefix: 'uploads',
@@ -226,12 +225,8 @@ import { FileManagerModule, GcsStorageEngine } from '@ashotsiroyan/file-manager'
         engine: new GcsStorageEngine({
           bucket: config.get('GCS_BUCKET'),
           baseUrlPublic: config.get('GCS_PUBLIC_BASE_URL'),
-          projectId: config.get('GCP_PROJECT'),
           auth: {
             keyFilename: config.get('GOOGLE_APPLICATION_CREDENTIALS'),
-            keyFileJson: config.get('GOOGLE_APPLICATION_CREDENTIALS_JSON'),
-            clientEmail: config.get('GCS_CLIENT_EMAIL'),
-            privateKey: config.get('GCS_PRIVATE_KEY'),
           },
         }),
         defaultPrefix: 'uploads',
@@ -306,15 +301,79 @@ res: Response
 
 ## 🧩 Advanced Usage
 
-### Dynamic engine setup
+### Multiple storage backends
+
+Import the module once per backend. Give every non-default storage a `name` and
+inject it via `@InjectFileManager(name)`. If you omit `name`, that instance
+becomes the default `FileManagerService`.
 
 ```ts
-FileManagerModule.forRootAsync({
-  useFactory: async () => ({
-    engine: new LocalStorageEngine({ baseDir: './data' }),
-    defaultPrefix: 'user_uploads',
-  }),
-});
+import { Module } from '@nestjs/common';
+import { Readable } from 'stream';
+import {
+  FileManagerModule,
+  FileManagerService,
+  InjectFileManager,
+  S3StorageEngine,
+  GcsStorageEngine,
+} from '@ashotsiroyan/file-manager';
+
+@Module({
+  imports: [
+    FileManagerModule.forRoot({
+      name: 'publicUploads',
+      engine: new S3StorageEngine({
+        bucket: process.env.AWS_PUBLIC_BUCKET!,
+      }),
+      defaultPrefix: 'public',
+      publicReadByDefault: true,
+    }),
+    FileManagerModule.forRoot({
+      name: 'backups',
+      engine: new GcsStorageEngine({
+        bucket: process.env.GCS_BACKUP_BUCKET!,
+      }),
+      defaultPrefix: 'backups',
+    }),
+  ],
+})
+export class FilesModule {
+  constructor(
+    @InjectFileManager('publicUploads')
+    private readonly publicFiles: FileManagerService,
+    @InjectFileManager('backups')
+    private readonly backups: FileManagerService,
+  ) {}
+
+  async uploadBackup(file: Express.Multer.File) {
+    await this.backups.put({
+      prefix: 'daily',
+      originalName: file.originalname,
+      body: file.stream ?? Readable.from(file.buffer ?? Buffer.alloc(0)),
+    });
+  }
+}
+```
+
+Async setup follows the same pattern — specify `name` on the module options and
+return the engine from the factory:
+
+```ts
+@Module({
+  imports: [
+    FileManagerModule.forRootAsync({
+      name: 'backups',
+      inject: [ConfigService],
+      useFactory: async (config: ConfigService) => ({
+        engine: new GcsStorageEngine({
+          bucket: config.getOrThrow('GCS_BACKUP_BUCKET'),
+        }),
+        defaultPrefix: 'backups',
+      }),
+    }),
+  ],
+})
+export class FilesModule {}
 ```
 
 ### Custom engine

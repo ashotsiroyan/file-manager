@@ -1,31 +1,45 @@
 import { DynamicModule, Module, Provider } from '@nestjs/common';
 import {
-  FILE_MANAGER_ENGINE,
-  FILE_MANAGER_OPTIONS,
-  FileManagerService,
-} from './file-manager.service';
-import {
   FileManagerModuleAsyncOptions,
   FileManagerModuleFactoryResult,
   FileManagerModuleOptions,
+  FileManagerServiceOptions,
 } from './interfaces';
+import {
+  FileManagerService,
+  getFileManagerServiceToken,
+} from './file-manager.service';
 
 const FILE_MANAGER_FACTORY_RESULT = Symbol('FILE_MANAGER_FACTORY_RESULT');
 
 @Module({})
 export class FileManagerModule {
   static forRoot(options: FileManagerModuleOptions): DynamicModule {
-    const { engine, ...rest } = options;
-    const providers: Provider[] = [
-      { provide: FILE_MANAGER_ENGINE, useValue: engine },
-      { provide: FILE_MANAGER_OPTIONS, useValue: rest || {} },
-      FileManagerService,
-    ];
+    const { engine, name, global } = options;
+    const serviceDefaults = extractServiceOptions(options);
+    const serviceToken = getFileManagerServiceToken(name);
+
+    const serviceProvider: Provider = {
+      provide: serviceToken,
+      useFactory: () => new FileManagerService(engine, serviceDefaults),
+    };
+
+    const providers: Provider[] = [serviceProvider];
+    const exports: Array<symbol | Function> = [serviceToken];
+
+    if (!name) {
+      providers.push({
+        provide: FileManagerService,
+        useExisting: serviceToken,
+      });
+      exports.push(FileManagerService);
+    }
+
     return {
-      global: !!options.global,
       module: FileManagerModule,
+      global: !!global,
       providers,
-      exports: [FileManagerService],
+      exports,
     };
   }
 
@@ -36,6 +50,8 @@ export class FileManagerModule {
       );
     }
 
+    const serviceToken = getFileManagerServiceToken(options.name);
+
     const factoryResultProvider: Provider<FileManagerModuleFactoryResult> = {
       provide: FILE_MANAGER_FACTORY_RESULT,
       useFactory: async (...args: any[]) =>
@@ -43,32 +59,40 @@ export class FileManagerModule {
       inject: options.inject || [],
     };
 
-    const engineProvider: Provider = {
-      provide: FILE_MANAGER_ENGINE,
-      useFactory: (result: FileManagerModuleFactoryResult) => result.engine,
+    const serviceProvider: Provider = {
+      provide: serviceToken,
+      useFactory: (result: FileManagerModuleFactoryResult) =>
+        new FileManagerService(result.engine, extractServiceOptions(result)),
       inject: [FILE_MANAGER_FACTORY_RESULT],
     };
 
-    const optionsProvider: Provider = {
-      provide: FILE_MANAGER_OPTIONS,
-      useFactory: (result: FileManagerModuleFactoryResult) => {
-        const { engine, ...rest } = result;
-        return rest;
-      },
-      inject: [FILE_MANAGER_FACTORY_RESULT],
-    };
+    const providers: Provider[] = [factoryResultProvider, serviceProvider];
+    const exports: Array<symbol | Function> = [serviceToken];
+
+    if (!options.name) {
+      providers.push({
+        provide: FileManagerService,
+        useExisting: serviceToken,
+      });
+      exports.push(FileManagerService);
+    }
 
     return {
-      global: !!options.global,
       module: FileManagerModule,
+      global: !!options.global,
       imports: options.imports,
-      providers: [
-        factoryResultProvider,
-        engineProvider,
-        optionsProvider,
-        FileManagerService,
-      ],
-      exports: [FileManagerService],
+      providers,
+      exports,
     };
   }
+}
+
+function extractServiceOptions(
+  input: FileManagerModuleOptions | FileManagerModuleFactoryResult,
+): FileManagerServiceOptions {
+  return {
+    defaultPrefix: input.defaultPrefix,
+    publicReadByDefault: input.publicReadByDefault,
+    maxConcurrentOps: input.maxConcurrentOps,
+  };
 }
