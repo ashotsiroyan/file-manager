@@ -27,7 +27,7 @@ export class FileManagerModule {
     const providers: Provider[] = [serviceProvider];
     const exports: Array<symbol | Function> = [serviceToken];
 
-    if (!name) {
+    if (!name && serviceToken !== FileManagerService) {
       providers.push({
         provide: FileManagerService,
         useExisting: serviceToken,
@@ -69,7 +69,7 @@ export class FileManagerModule {
     const providers: Provider[] = [factoryResultProvider, serviceProvider];
     const exports: Array<symbol | Function> = [serviceToken];
 
-    if (!options.name) {
+    if (!options.name && serviceToken !== FileManagerService) {
       providers.push({
         provide: FileManagerService,
         useExisting: serviceToken,
