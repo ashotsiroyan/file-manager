@@ -43,5 +43,6 @@ export type AwsSdkModules = {
   DeleteObjectCommand: any;
   DeleteObjectsCommand: any;
   ListObjectsV2Command: any;
+  HeadObjectCommand: any;
   getSignedUrl: any;
 };

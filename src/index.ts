@@ -10,3 +10,5 @@ export * from './engines/gcs.engine';
 export * from './utils/file-key.util';
 
 export * from './decorators';
+
+export * from './dtos';

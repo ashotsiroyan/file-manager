@@ -4,8 +4,7 @@ import { StorageEngine } from './storage-engine';
 /**
  * Shared configuration returned by sync/async factories.
  */
-export interface FileManagerModuleFactoryResult
-  extends FileManagerServiceOptions {
+export interface FileManagerModuleFactoryResult extends FileManagerServiceOptions {
   /** Storage backend implementation used by the service. */
   engine: StorageEngine;
 }
@@ -13,8 +12,7 @@ export interface FileManagerModuleFactoryResult
 /**
  * Synchronous registration options for `FileManagerModule.forRoot`.
  */
-export interface FileManagerModuleOptions
-  extends FileManagerModuleFactoryResult {
+export interface FileManagerModuleOptions extends FileManagerModuleFactoryResult {
   /** Unique storage identifier when registering multiple instances. */
   name?: string;
   /** Register the module globally across the Nest application. */

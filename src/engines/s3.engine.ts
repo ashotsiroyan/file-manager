@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import { PassThrough } from 'stream';
 import {
   AwsSdkModules,
   GetObjectResult,
@@ -27,6 +28,7 @@ function loadAwsSdk(): AwsSdkModules {
       DeleteObjectCommand: client.DeleteObjectCommand,
       DeleteObjectsCommand: client.DeleteObjectsCommand,
       ListObjectsV2Command: client.ListObjectsV2Command,
+      HeadObjectCommand: client.HeadObjectCommand,
       getSignedUrl: presigner.getSignedUrl,
     };
     return awsSdkCache;
@@ -35,6 +37,15 @@ function loadAwsSdk(): AwsSdkModules {
       'S3 engine requires optional packages @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
     );
   }
+}
+
+function buildCopySource(bucket: string, key: string) {
+  const encodedBucket = encodeURIComponent(bucket);
+  const encodedKey = key
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `/${encodedBucket}/${encodedKey}`;
 }
 
 export class S3StorageEngine implements StorageEngine {
@@ -56,6 +67,7 @@ export class S3StorageEngine implements StorageEngine {
       DeleteObjectCommand,
       DeleteObjectsCommand,
       ListObjectsV2Command,
+      HeadObjectCommand,
       getSignedUrl,
     } = loadAwsSdk();
 
@@ -82,25 +94,48 @@ export class S3StorageEngine implements StorageEngine {
         DeleteObjectCommand,
         DeleteObjectsCommand,
         ListObjectsV2Command,
+        HeadObjectCommand,
       },
     };
   }
 
   async putObject(input: PutObjectInput): Promise<PutObjectResult> {
     const { PutObjectCommand } = this.signer.cmds;
+
+    let size: number | undefined;
+    let body = input.body;
+    let measuredBytes: number | undefined;
+    let sourceStream: NodeJS.ReadableStream | undefined;
+
+    if (body instanceof Buffer || body instanceof Uint8Array) {
+      size = body.length;
+    } else if ((body as any)?.pipe) {
+      sourceStream = body as NodeJS.ReadableStream;
+      measuredBytes = 0;
+      const counter = new PassThrough();
+      counter.on('data', (chunk) => {
+        measuredBytes = (measuredBytes || 0) + chunk.length;
+      });
+      sourceStream.on('error', (err) => counter.destroy(err));
+      sourceStream.pipe(counter);
+      body = counter;
+    }
+
     const res = await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucketName,
         Key: input.key,
-        Body: input.body as any,
+        Body: body as any,
         ContentType: input.contentType,
         Metadata: input.metadata,
         ACL: input.aclPublic ? 'public-read' : undefined,
+        ContentLength: size,
       }),
     );
     return {
       key: input.key,
       etag: res.ETag,
+      size: size ?? measuredBytes,
       url: this.resolvePublicUrl(input.key),
     };
   }
@@ -164,7 +199,7 @@ export class S3StorageEngine implements StorageEngine {
     await this.s3.send(
       new CopyObjectCommand({
         Bucket: this.bucketName,
-        CopySource: `/${this.bucketName}/${srcKey}`,
+        CopySource: buildCopySource(this.bucketName, srcKey),
         Key: destKey,
       }),
     );
@@ -177,10 +212,16 @@ export class S3StorageEngine implements StorageEngine {
 
   async exists(key: string): Promise<boolean> {
     try {
-      await this.getObject(key);
+      const { HeadObjectCommand } = this.signer.cmds;
+      await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
       return true;
-    } catch {
-      return false;
+    } catch (err: any) {
+      if (err.name === 'NotFound' || err.$metadata?.httpStatusCode === 404) {
+        return false;
+      }
+      throw err;
     }
   }
 

@@ -14,15 +14,34 @@ import {
   promises as fsp,
 } from 'fs';
 import { access, mkdir, readdir, rename, stat } from 'fs/promises';
-import { dirname, join, resolve } from 'path';
+import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import { lookup as mimeLookup } from 'mime-types';
 import { ReadableFromBuffer } from '../utils/engine-auth.util';
 
 export class LocalStorageEngine implements StorageEngine {
-  constructor(private readonly opts: LocalEngineOptions) {}
+  private readonly baseDir: string;
 
-  private abs(key: string) {
-    return resolve(join(this.opts.baseDir, key));
+  constructor(private readonly opts: LocalEngineOptions) {
+    if (!opts?.baseDir) {
+      throw new Error('Local engine requires a baseDir.');
+    }
+    this.baseDir = resolve(opts.baseDir);
+  }
+
+  private abs(key: string, allowBase = false) {
+    const safeKey = key ?? '';
+    if (!allowBase && !safeKey.trim()) {
+      throw new Error('Key is required.');
+    }
+
+    const full = resolve(this.baseDir, safeKey);
+    const rel = relative(this.baseDir, full);
+
+    if (rel.startsWith('..') || isAbsolute(rel) || (rel === '' && !allowBase)) {
+      throw new Error('Invalid key path.');
+    }
+
+    return full;
   }
 
   async putObject(input: PutObjectInput): Promise<PutObjectResult> {
@@ -34,12 +53,13 @@ export class LocalStorageEngine implements StorageEngine {
 
     const size = await new Promise<number>((resolveSize, reject) => {
       let bytes = 0;
-      const src =
+      const src = (
         body instanceof Buffer || body instanceof Uint8Array
           ? ReadableFromBuffer(body)
-          : (body as NodeJS.ReadableStream);
+          : body
+      ) as any;
 
-      src.on('data', (chunk) => (bytes += chunk.length));
+      src.on('data', (chunk: any) => (bytes += chunk.length));
       src.on('error', reject);
       write.on('error', reject);
       write.on('finish', () => resolveSize(bytes));
@@ -68,7 +88,7 @@ export class LocalStorageEngine implements StorageEngine {
   }
 
   async deleteDirectory(prefix: string): Promise<void> {
-    await fsp.rm(this.abs(prefix), { recursive: true, force: true });
+    await fsp.rm(this.abs(prefix, true), { recursive: true, force: true });
   }
 
   async copyObject(srcKey: string, destKey: string): Promise<void> {
@@ -95,27 +115,68 @@ export class LocalStorageEngine implements StorageEngine {
     cursor?: string,
     limit = 100,
   ): Promise<ListObjectsResult> {
-    const dir = this.abs(prefix);
-    let items: string[] = [];
+    const target = this.abs(prefix, true);
+    const start = cursor ? parseInt(cursor, 10) : 0;
+    const items: string[] = [];
+    let seen = 0;
+    let hasMore = false;
+
+    let stats;
     try {
-      const entries = await readdir(dir, { withFileTypes: true });
-      for (const e of entries) {
-        const rel = join(prefix, e.name).replace(/\\/g, '/');
-        if (e.isDirectory()) {
-          items.push(`${rel}/`);
-        } else {
-          items.push(rel);
-        }
-      }
+      stats = await stat(target);
     } catch {
-      items = [];
+      return { keys: [], nextCursor: undefined };
     }
 
-    const start = cursor ? parseInt(cursor, 10) : 0;
-    const slice = items.slice(start, start + limit);
-    const nextCursor =
-      start + limit < items.length ? String(start + limit) : undefined;
-    return { keys: slice, nextCursor };
+    if (stats.isFile()) {
+      if (start === 0 && limit > 0) {
+        return { keys: [prefix.replace(/\\/g, '/')], nextCursor: undefined };
+      }
+      return { keys: [], nextCursor: undefined };
+    }
+
+    const queue: string[] = [target];
+
+    while (queue.length) {
+      const dir = queue.shift()!;
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      entries.sort((a, b) => a.name.localeCompare(b.name));
+
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          queue.push(fullPath);
+          continue;
+        }
+
+        if (seen < start) {
+          seen++;
+          continue;
+        }
+
+        if (items.length >= limit) {
+          hasMore = true;
+          break;
+        }
+
+        const relKey = relative(this.baseDir, fullPath).replace(/\\/g, '/');
+        items.push(relKey);
+        seen++;
+      }
+
+      if (hasMore) break;
+    }
+
+    return {
+      keys: items,
+      nextCursor: hasMore ? String(start + items.length) : undefined,
+    };
   }
 
   async getSignedUrl(opts: SignedUrlOptions): Promise<string> {

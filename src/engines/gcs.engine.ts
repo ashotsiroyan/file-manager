@@ -1,13 +1,13 @@
 import { createRequire } from 'module';
 import {
+  GcsEngineOptions,
+  GcsSdkModule,
   GetObjectResult,
   ListObjectsResult,
   PutObjectInput,
   PutObjectResult,
   SignedUrlOptions,
   StorageEngine,
-  GcsEngineOptions,
-  GcsSdkModule,
 } from '../interfaces';
 import {
   ReadableFromBuffer,
@@ -66,15 +66,9 @@ export class GcsStorageEngine implements StorageEngine {
     if (opts.projectId) storageConfig.projectId = opts.projectId;
 
     const authCfg = resolveGcsAuthConfig(opts.auth);
-    if (authCfg.credentials?.private_key) {
-      authCfg.credentials.private_key = authCfg.credentials.private_key.replace(
-        /\\n/g,
-        '\n',
-      );
-    }
     Object.assign(storageConfig, authCfg);
 
-    this.storage = new Storage(storageConfig);
+    this.storage = opts.storage ?? new Storage(storageConfig);
 
     this.bucket = this.storage.bucket(this.bucketName);
   }
@@ -92,11 +86,13 @@ export class GcsStorageEngine implements StorageEngine {
 
     const size = await new Promise<number>((resolve, reject) => {
       let bytes = 0;
-      const src =
+      const src = (
         input.body instanceof Buffer || input.body instanceof Uint8Array
           ? ReadableFromBuffer(input.body)
-          : (input.body as NodeJS.ReadableStream);
-      src.on('data', (c) => (bytes += c.length));
+          : input.body
+      ) as any;
+
+      src.on('data', (c: any) => (bytes += c.length));
       src.on('error', reject);
       stream.on('error', reject);
       stream.on('finish', () => resolve(bytes));
@@ -160,6 +156,7 @@ export class GcsStorageEngine implements StorageEngine {
     const file = this.bucket.file(opts.key);
     const action = opts.action === 'get' ? 'read' : 'write';
     const [url] = await file.getSignedUrl({
+      version: 'v4',
       action,
       expires: Date.now() + 1000 * (opts.expiresInSeconds ?? 900),
       contentType: opts.contentType,
