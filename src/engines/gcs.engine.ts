@@ -25,7 +25,7 @@ function loadGcsSdk(): GcsSdkModule {
     return gcsSdkCache;
   } catch {
     throw new Error(
-      'GCS engine requires optional package @google-cloud/storage. Install it to use GcsStorageEngine.',
+      'GCS engine requires optional peer dependency @google-cloud/storage. Install it to use GcsStorageEngine.',
     );
   }
 }

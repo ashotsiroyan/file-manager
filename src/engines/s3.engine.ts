@@ -34,7 +34,7 @@ function loadAwsSdk(): AwsSdkModules {
     return awsSdkCache;
   } catch (error) {
     throw new Error(
-      'S3 engine requires optional packages @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
+      'S3 engine requires optional peer dependencies @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
     );
   }
 }

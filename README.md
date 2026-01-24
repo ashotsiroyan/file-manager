@@ -20,11 +20,13 @@ injectable design.
 
 ## 📥 Installation
 
+The cloud drivers are **optional peer dependencies** — install only the one that matches your engine.
+
 ```bash
 # Base package
 npm install --save @ashotsiroyan/file-manager
 
-# Optional: install for S3
+# Optional: install for S3 (install both)
 npm install --save @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 
 # Optional: install for Google Cloud Storage
