@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import type { Bucket, Storage } from '@google-cloud/storage';
 import {
   GcsEngineOptions,
   GcsSdkModule,
@@ -31,8 +32,8 @@ function loadGcsSdk(): GcsSdkModule {
 }
 
 export class GcsStorageEngine implements StorageEngine {
-  private storage: any;
-  private bucket: any;
+  private storage: Storage;
+  private bucket: Bucket;
   private readonly bucketName: string;
   private readonly publicBaseUrl?: string;
 

@@ -61,7 +61,7 @@ export interface GetObjectResult {
   /** Total size of the payload in bytes. */
   size?: number;
   /** Arbitrary metadata persisted with the object. */
-  metadata?: Record<string, string>;
+  metadata?: Record<string, string | boolean | number | null>;
   /** Last modification time reported by the backend. */
   lastModified?: Date;
 }

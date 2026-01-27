@@ -1,3 +1,13 @@
+import type {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { createRequire } from 'module';
 import { PassThrough } from 'stream';
 import {
@@ -49,8 +59,19 @@ function buildCopySource(bucket: string, key: string) {
 }
 
 export class S3StorageEngine implements StorageEngine {
-  private s3: any;
-  private signer: any;
+  private s3: S3Client;
+  private signer: {
+    getSignedUrl: AwsSdkModules['getSignedUrl'];
+    cmds: {
+      GetObjectCommand: typeof GetObjectCommand;
+      PutObjectCommand: typeof PutObjectCommand;
+      CopyObjectCommand: typeof CopyObjectCommand;
+      DeleteObjectCommand: typeof DeleteObjectCommand;
+      DeleteObjectsCommand: typeof DeleteObjectsCommand;
+      ListObjectsV2Command: typeof ListObjectsV2Command;
+      HeadObjectCommand: typeof HeadObjectCommand;
+    };
+  };
   private readonly bucketName: string;
   private readonly publicBaseUrl?: string;
 
@@ -247,16 +268,24 @@ export class S3StorageEngine implements StorageEngine {
 
   async getSignedUrl(opts: SignedUrlOptions): Promise<string> {
     const { GetObjectCommand, PutObjectCommand } = this.signer.cmds;
-    const Command = opts.action === 'get' ? GetObjectCommand : PutObjectCommand;
-    return this.signer.getSignedUrl(
-      this.s3,
-      new Command({
+    let command: GetObjectCommand | PutObjectCommand;
+
+    if (opts.action === 'get') {
+      command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: opts.key,
+      });
+    } else {
+      command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: opts.key,
         ContentType: opts.contentType,
-      }),
-      { expiresIn: opts.expiresInSeconds ?? 900 },
-    );
+      });
+    }
+
+    return this.signer.getSignedUrl(this.s3, command, {
+      expiresIn: opts.expiresInSeconds ?? 900,
+    });
   }
 
   resolvePublicUrl(key: string): string | undefined {
