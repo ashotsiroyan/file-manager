@@ -1,5 +1,4 @@
-export * from './interfaces/types';
-export * from './interfaces/storage-engine';
+export * from './interfaces';
 export * from './file-manager.service';
 export * from './file-manager.module';
 

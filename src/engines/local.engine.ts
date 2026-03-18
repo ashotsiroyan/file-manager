@@ -53,11 +53,10 @@ export class LocalStorageEngine implements StorageEngine {
 
     const size = await new Promise<number>((resolveSize, reject) => {
       let bytes = 0;
-      const src = (
+      const src: NodeJS.ReadableStream =
         body instanceof Buffer || body instanceof Uint8Array
           ? ReadableFromBuffer(body)
-          : body
-      ) as any;
+          : body;
 
       src.on('data', (chunk: any) => (bytes += chunk.length));
       src.on('error', reject);
