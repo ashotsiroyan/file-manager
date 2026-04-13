@@ -9,7 +9,6 @@ import type {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { createRequire } from 'module';
-import { PassThrough } from 'stream';
 import {
   AwsSdkModules,
   GetObjectResult,
@@ -29,9 +28,11 @@ function loadAwsSdk(): AwsSdkModules {
 
   try {
     const client = requireFn('@aws-sdk/client-s3');
+    const libStorage = requireFn('@aws-sdk/lib-storage');
     const presigner = requireFn('@aws-sdk/s3-request-presigner');
     awsSdkCache = {
       S3Client: client.S3Client,
+      Upload: libStorage.Upload,
       GetObjectCommand: client.GetObjectCommand,
       PutObjectCommand: client.PutObjectCommand,
       CopyObjectCommand: client.CopyObjectCommand,
@@ -44,7 +45,7 @@ function loadAwsSdk(): AwsSdkModules {
     return awsSdkCache;
   } catch (error) {
     throw new Error(
-      'S3 engine requires optional peer dependencies @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
+      'S3 engine requires optional peer dependencies @aws-sdk/client-s3, @aws-sdk/lib-storage, and @aws-sdk/s3-request-presigner. Install them to use S3StorageEngine.',
     );
   }
 }
@@ -61,6 +62,7 @@ function buildCopySource(bucket: string, key: string) {
 export class S3StorageEngine implements StorageEngine {
   private s3: S3Client;
   private signer: {
+    upload: AwsSdkModules['Upload'];
     getSignedUrl: AwsSdkModules['getSignedUrl'];
     cmds: {
       GetObjectCommand: typeof GetObjectCommand;
@@ -74,14 +76,25 @@ export class S3StorageEngine implements StorageEngine {
   };
   private readonly bucketName: string;
   private readonly publicBaseUrl?: string;
+  private readonly uploadQueueSize?: number;
+  private readonly uploadPartSize?: number;
+  private readonly leavePartsOnError?: boolean;
 
   constructor(opts: S3EngineOptions) {
     if (!opts || !opts.bucket) {
       throw new Error('S3 bucket is required.');
     }
 
+    if (
+      typeof opts.uploadPartSize === 'number' &&
+      opts.uploadPartSize < 5 * 1024 * 1024
+    ) {
+      throw new Error('S3 multipart uploadPartSize must be at least 5 MiB.');
+    }
+
     const {
       S3Client,
+      Upload,
       GetObjectCommand,
       PutObjectCommand,
       CopyObjectCommand,
@@ -97,6 +110,9 @@ export class S3StorageEngine implements StorageEngine {
     this.publicBaseUrl = opts.baseUrlPublic
       ? opts.baseUrlPublic.replace(/\/$/, '')
       : undefined;
+    this.uploadQueueSize = opts.uploadQueueSize;
+    this.uploadPartSize = opts.uploadPartSize;
+    this.leavePartsOnError = opts.leavePartsOnError;
 
     const clientConfig: Record<string, any> = { ...(opts.clientConfig || {}) };
     if (opts.region) clientConfig.region = opts.region;
@@ -107,6 +123,7 @@ export class S3StorageEngine implements StorageEngine {
 
     this.s3 = opts.client ?? new S3Client(clientConfig);
     this.signer = {
+      upload: Upload,
       getSignedUrl,
       cmds: {
         GetObjectCommand,
@@ -121,29 +138,16 @@ export class S3StorageEngine implements StorageEngine {
   }
 
   async putObject(input: PutObjectInput): Promise<PutObjectResult> {
-    const { PutObjectCommand } = this.signer.cmds;
-
     let size: number | undefined;
-    let body = input.body;
-    let measuredBytes: number | undefined;
-    let sourceStream: NodeJS.ReadableStream | undefined;
+    const body = input.body;
 
     if (body instanceof Buffer || body instanceof Uint8Array) {
       size = body.length;
-    } else if ((body as any)?.pipe) {
-      sourceStream = body as NodeJS.ReadableStream;
-      measuredBytes = 0;
-      const counter = new PassThrough();
-      counter.on('data', (chunk) => {
-        measuredBytes = (measuredBytes || 0) + chunk.length;
-      });
-      sourceStream.on('error', (err) => counter.destroy(err));
-      sourceStream.pipe(counter);
-      body = counter;
     }
 
-    const res = await this.s3.send(
-      new PutObjectCommand({
+    const upload = new this.signer.upload({
+      client: this.s3,
+      params: {
         Bucket: this.bucketName,
         Key: input.key,
         Body: body as any,
@@ -151,12 +155,18 @@ export class S3StorageEngine implements StorageEngine {
         Metadata: input.metadata,
         ACL: input.aclPublic ? 'public-read' : undefined,
         ContentLength: size,
-      }),
-    );
+      },
+      queueSize: this.uploadQueueSize,
+      partSize: this.uploadPartSize,
+      leavePartsOnError: this.leavePartsOnError,
+    });
+
+    const res = await upload.done();
+
     return {
       key: input.key,
       etag: res.ETag,
-      size: size ?? measuredBytes,
+      size,
       url: this.resolvePublicUrl(input.key),
     };
   }

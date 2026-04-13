@@ -30,6 +30,12 @@ export interface S3EngineOptions {
   client?: any;
   /** Extra config forwarded to the S3 client constructor. */
   clientConfig?: Record<string, any>;
+  /** Number of parts to upload concurrently during multipart uploads. */
+  uploadQueueSize?: number;
+  /** Multipart chunk size in bytes. Must be at least 5 MiB when set. */
+  uploadPartSize?: number;
+  /** Keep uploaded parts in S3 when a multipart upload fails. */
+  leavePartsOnError?: boolean;
 }
 
 /**
@@ -37,6 +43,7 @@ export interface S3EngineOptions {
  */
 export type AwsSdkModules = {
   S3Client: any;
+  Upload: any;
   GetObjectCommand: any;
   PutObjectCommand: any;
   CopyObjectCommand: any;
